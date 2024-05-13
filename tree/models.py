@@ -10,11 +10,13 @@ from .query import get_path_fields, get_path_field, TreeManager
 if TYPE_CHECKING:
     from .types import Path
 
-    class MixinProtocol(Model): ...
+    class MixinProtocol(Model):
+        pass
 
 else:
 
-    class MixinProtocol(Protocol): ...
+    class MixinProtocol(Protocol):
+        pass
 
 
 class TreeModelMixin(MixinProtocol):
