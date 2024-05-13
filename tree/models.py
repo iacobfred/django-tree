@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Optional, cast, Self, Protocol, override
+from typing import TYPE_CHECKING, Optional, cast, Self, override
 
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 else:
 
-    class MixinProtocol(Protocol):
+    class MixinProtocol:
         pass
 
 
