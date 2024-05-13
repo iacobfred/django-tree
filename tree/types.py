@@ -1,13 +1,26 @@
-from django.db.models import QuerySet
+from django.db.models import Model, QuerySet
+from typing import cast, Generic, TypeVar, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
+    from django.db.models import Field
+
+ModelT = TypeVar("ModelT", bound=Model)
 
 
-class Path:
-    def __init__(self, field, value):
+class Path(Generic[ModelT]):
+    @property
+    def model(self) -> ModelT:
+        return cast(ModelT, self.field.model)
+
+    def __init__(self, field: "Field[Any, Any]", value):
+
         self.field = field
         self.attname = getattr(self.field, 'attname', None)
         self.field_bound = self.attname is not None
-        self.qs = (self.field.model._default_manager.all()
-                   if self.field_bound else QuerySet())
+        self.qs = (
+            self.field.model._default_manager.all() if self.field_bound else QuerySet()
+        )
         self.value = value
 
     def __repr__(self):
@@ -71,14 +84,16 @@ class Path:
     def __iter__(self):
         return iter(self.value)
 
-    def get_children(self):
+    def get_children(self) -> "QuerySet[ModelT]":
         if not self.value:
             return self.qs.none()
-        return self.qs.filter(**{
-            f'{self.attname}__child_of': self.value,
-        })
+        return self.qs.filter(
+            **{
+                f'{self.attname}__child_of': self.value,
+            }
+        )
 
-    def get_ancestors(self, include_self=False):
+    def get_ancestors(self, include_self: bool = False) -> "QuerySet[ModelT]":
         if not self.value or (self.is_root() and not include_self):
             return self.qs.none()
         path = self.value
@@ -86,51 +101,67 @@ class Path:
             path = path[:-1]
         # Using the lookup `ancestor_of` here is slower,
         # so we explicitly specify the ancestors’ paths.
-        return self.qs.filter(**{self.attname + '__in': [
-            path[:i] for i in range(1, len(path) + 1)
-        ]})
+        return self.qs.filter(
+            **{self.attname + '__in': [path[:i] for i in range(1, len(path) + 1)]}
+        )
 
-    def get_descendants(self, include_self=False):
+    def get_descendants(self, include_self: bool = False) -> "QuerySet[ModelT]":
         if not self.value:
             return self.qs.none()
         # Using the lookup `descendant_of` here is slower,
         # so we explicitly specify the path slicing comparison.
-        qs = self.qs.filter(**{
-            f'{self.attname}__0_{len(self.value)}': self.value,
-        })
+        qs = self.qs.filter(
+            **{
+                f'{self.attname}__0_{len(self.value)}': self.value,
+            }
+        )
         if include_self:
             return qs
         return qs.filter(**{f'{self.attname}__level__gt': len(self.value)})
 
-    def get_siblings(self, include_self=False, queryset=None):
+    def get_siblings(
+        self,
+        include_self: bool = False,
+        queryset=None,
+    ) -> "QuerySet[ModelT]":
         if not self.value:
             return self.qs.none()
 
         qs = self.qs if queryset is None else queryset
-        qs = qs.filter(**{
-            self.attname + '__sibling_of': self.value,
-        })
+        qs = qs.filter(
+            **{
+                self.attname + '__sibling_of': self.value,
+            }
+        )
         if include_self:
             return qs
         return qs.exclude(**{self.attname: self.value})
 
-    def get_prev_siblings(self, include_self=False, queryset=None):
+    def get_prev_siblings(
+        self,
+        include_self: bool = False,
+        queryset=None,
+    ) -> "QuerySet[ModelT]":
         if not self.value:
             return self.qs.none()
-        siblings = self.get_siblings(include_self=include_self,
-                                     queryset=queryset)
+        siblings = self.get_siblings(include_self=include_self, queryset=queryset)
         lookup = '__lte' if include_self else '__lt'
-        return (siblings.filter(**{self.attname + lookup: self.value})
-                .order_by('-' + self.attname))
+        return siblings.filter(**{self.attname + lookup: self.value}).order_by(
+            '-' + self.attname
+        )
 
-    def get_next_siblings(self, include_self=False, queryset=None):
+    def get_next_siblings(
+        self,
+        include_self: bool = False,
+        queryset=None,
+    ) -> "QuerySet[ModelT]":
         if not self.value:
             return self.qs.none()
-        siblings = self.get_siblings(include_self=include_self,
-                                     queryset=queryset)
+        siblings = self.get_siblings(include_self=include_self, queryset=queryset)
         lookup = '__gte' if include_self else '__gt'
-        return (siblings.filter(**{self.attname + lookup: self.value})
-                .order_by(self.attname))
+        return siblings.filter(**{self.attname + lookup: self.value}).order_by(
+            self.attname
+        )
 
     def get_prev_sibling(self, queryset=None):
         if not self.value:
@@ -144,19 +175,22 @@ class Path:
 
         return self.get_next_siblings(queryset=queryset).first()
 
-    def get_level(self):
+    def get_level(self) -> bool:
         if self.value:
             return len(self.value)
+        raise ValueError("Path value is not yet set.")
 
-    def is_root(self):
+    def is_root(self) -> bool:
         if self.value:
             return len(self.value) == 1
+        raise ValueError("Path value is not yet set.")
 
-    def is_leaf(self):
+    def is_leaf(self) -> bool:
         if self.value:
             return not self.get_children().exists()
+        raise ValueError("Path value is not yet set.")
 
-    def is_ancestor_of(self, other, include_self=False):
+    def is_ancestor_of(self, other, include_self: bool = False) -> bool:
         if not self.value:
             return False
         if isinstance(other, Path):
@@ -164,14 +198,12 @@ class Path:
         if not other:
             return False
         if not isinstance(other, list):
-            raise TypeError(
-                '`other` must be a `Path` instance or a list of decimals.'
-            )
+            raise TypeError('`other` must be a `Path` instance or a list of decimals.')
         if not include_self and self.value == other:
             return False
-        return other[:len(self.value)] == self.value
+        return other[: len(self.value)] == self.value
 
-    def is_descendant_of(self, other, include_self=False):
+    def is_descendant_of(self, other, include_self: bool = False):
         if not self.value:
             return False
         if isinstance(other, Path):
@@ -179,12 +211,10 @@ class Path:
         if not other:
             return False
         if not isinstance(other, list):
-            raise TypeError(
-                '`other` must be a `Path` instance or a list of decimals.'
-            )
+            raise TypeError('`other` must be a `Path` instance or a list of decimals.')
         if not include_self and self.value == other:
             return False
-        return self.value[:len(other)] == other
+        return self.value[: len(other)] == other
 
 
 # Tells psycopg2 how to prepare a Path object for the database,

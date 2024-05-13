@@ -1,78 +1,121 @@
 from contextlib import contextmanager
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, cast, Self, Protocol, override
 
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 
-from .query import _get_path_fields, _get_path_field, TreeManager
+from .query import get_path_fields, get_path_field, TreeManager
+
+if TYPE_CHECKING:
+    from .types import Path
+
+    class MixinProtocol(Model): ...
+
+else:
+
+    class MixinProtocol(Protocol): ...
 
 
-class TreeModelMixin:
+class TreeModelMixin(MixinProtocol):
     @classmethod
-    def _get_path_fields(cls, name: Optional[str] = None):
-        return _get_path_fields(cls, name)
+    def _get_path_fields(cls, name: "Optional[str]" = None):
+        model_cls = cast(type[Model], cls)
+        return get_path_fields(model_cls, name)
 
     @classmethod
-    def _get_path_field(cls, name):
-        return _get_path_field(cls, name)
+    def _get_path_field(cls, name: "Optional[str]"):
+        model_cls = cast(type[Model], cls)
+        return get_path_field(model_cls, name)
 
-    def _get_path_value(self, path_field):
+    def _get_path_value(self, path_field: "Optional[str]") -> "Path[Self]":
         return getattr(self, self._get_path_field(path_field).name)
 
-    def get_children(self, path_field=None):
+    def get_children(self, path_field: "Optional[str]" = None) -> "QuerySet[Self]":
         return self._get_path_value(path_field).get_children()
 
-    def get_ancestors(self, include_self=False, path_field=None):
-        return (self._get_path_value(path_field)
-                .get_ancestors(include_self=include_self))
+    def get_ancestors(
+        self,
+        include_self: bool = False,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_ancestors(include_self=include_self)
 
-    def get_descendants(self, include_self=False, path_field=None):
-        return (self._get_path_value(path_field)
-                .get_descendants(include_self=include_self))
+    def get_descendants(
+        self,
+        include_self: bool = False,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_descendants(
+            include_self=include_self
+        )
 
-    def get_siblings(self, include_self=False, queryset=None, path_field=None):
-        return (self._get_path_value(path_field)
-                .get_siblings(include_self=include_self, queryset=queryset))
+    def get_siblings(
+        self,
+        include_self: bool = False,
+        queryset: "Optional[QuerySet[Self]]" = None,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_siblings(
+            include_self=include_self, queryset=queryset
+        )
 
-    def get_prev_siblings(self, include_self=False, queryset=None,
-                          path_field=None):
-        return (self._get_path_value(path_field)
-                .get_prev_siblings(include_self=include_self,
-                                   queryset=queryset))
+    def get_prev_siblings(
+        self,
+        include_self: bool = False,
+        queryset: "Optional[QuerySet[Self]]" = None,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_prev_siblings(
+            include_self=include_self, queryset=queryset
+        )
 
-    def get_next_siblings(self, include_self=False, queryset=None,
-                          path_field=None):
-        return (self._get_path_value(path_field)
-                .get_next_siblings(include_self=include_self,
-                                   queryset=queryset))
+    def get_next_siblings(
+        self,
+        include_self: bool = False,
+        queryset: "Optional[QuerySet[Self]]" = None,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_next_siblings(
+            include_self=include_self, queryset=queryset
+        )
 
-    def get_prev_sibling(self, queryset=None, path_field=None):
-        return (self._get_path_value(path_field)
-                .get_prev_sibling(queryset=queryset))
+    def get_prev_sibling(
+        self,
+        queryset: "Optional[QuerySet[Self]]" = None,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_prev_sibling(queryset=queryset)
 
-    def get_next_sibling(self, queryset=None, path_field=None):
-        return (self._get_path_value(path_field)
-                .get_next_sibling(queryset=queryset))
+    def get_next_sibling(
+        self,
+        queryset: "Optional[QuerySet[Self]]" = None,
+        path_field: "Optional[str]" = None,
+    ):
+        return self._get_path_value(path_field).get_next_sibling(queryset=queryset)
 
-    def get_level(self, path_field=None):
+    def get_level(self, path_field: "Optional[str]" = None):
         return self._get_path_value(path_field).get_level()
 
-    def is_root(self, path_field=None):
+    def is_root(self, path_field: "Optional[str]" = None):
         return self._get_path_value(path_field).is_root()
 
-    def is_leaf(self, path_field=None):
+    def is_leaf(self, path_field: "Optional[str]" = None):
         return self._get_path_value(path_field).is_leaf()
 
-    def is_ancestor_of(self, other, include_self=False, path_field=None):
-        return (self._get_path_value(path_field)
-                .is_ancestor_of(other._get_path_value(path_field),
-                                include_self=include_self))
+    def is_ancestor_of(
+        self, other, include_self=False, path_field: "Optional[str]" = None
+    ):
+        return self._get_path_value(path_field).is_ancestor_of(
+            other._get_path_value(path_field), include_self=include_self
+        )
 
-    def is_descendant_of(self, other, include_self=False, path_field=None):
-        return (self._get_path_value(path_field)
-                .is_descendant_of(other._get_path_value(path_field),
-                                  include_self=include_self))
+    def is_descendant_of(
+        self, other, include_self=False, path_field: "Optional[str]" = None
+    ):
+        return self._get_path_value(path_field).is_descendant_of(
+            other._get_path_value(path_field), include_self=include_self
+        )
 
     def clean(self):
         super().clean()
@@ -94,21 +137,25 @@ class TreeModelMixin:
 
                 new_parent_path = getattr(new_parent, path_field.attname)
                 if new_parent_path.is_descendant_of(
-                    old_path, include_self=True,
+                    old_path,
+                    include_self=True,
                 ):
-                    raise ValidationError({
-                        parent_field.name: ValidationError(
-                            parent_field.error_messages['invalid_choice'],
-                            code='invalid_choice',
-                            params={'value': str(new_parent)},
-                        )
-                    })
+                    raise ValidationError(
+                        {
+                            parent_field.name: ValidationError(
+                                parent_field.error_messages['invalid_choice'],
+                                code='invalid_choice',
+                                params={'value': str(new_parent)},
+                            )
+                        }
+                    )
 
     def delete(self, using=None, **kwargs):
-        assert self.pk is not None, (
-            "%s object can't be deleted because "
-            "its %s attribute is set to None." %
-            (self._meta.object_name, self._meta.pk.attname)
+        assert (
+            self.pk is not None
+        ), "%s object can't be deleted because " "its %s attribute is set to None." % (
+            self._meta.object_name,
+            self._meta.pk.attname,
         )
         qs = self.get_descendants(include_self=True)
         if using is not None:
@@ -116,7 +163,9 @@ class TreeModelMixin:
         return qs.delete()
 
     @classmethod
-    def rebuild_paths(cls, db_alias=DEFAULT_DB_ALIAS, path_field=None):
+    def rebuild_paths(
+        cls, db_alias=DEFAULT_DB_ALIAS, path_field: "Optional[str]" = None
+    ):
         """
         Rebuilds the paths of all the ``PathField``s
         if ``path_field`` is ``None``.  Otherwise, only paths from
@@ -127,19 +176,25 @@ class TreeModelMixin:
             field.rebuild(db_alias=db_alias)
 
     @classmethod
-    def disable_tree_trigger(cls, db_alias=DEFAULT_DB_ALIAS, path_field=None):
+    def disable_tree_trigger(
+        cls, db_alias=DEFAULT_DB_ALIAS, path_field: "Optional[str]" = None
+    ):
         for field in cls._get_path_fields(path_field):
             field.disable_trigger(db_alias=db_alias)
 
     @classmethod
-    def enable_tree_trigger(cls, db_alias=DEFAULT_DB_ALIAS, path_field=None):
+    def enable_tree_trigger(
+        cls, db_alias=DEFAULT_DB_ALIAS, path_field: "Optional[str]" = None
+    ):
         for field in cls._get_path_fields(path_field):
             field.enable_trigger(db_alias=db_alias)
 
     @classmethod
     @contextmanager
     @transaction.atomic
-    def disabled_tree_trigger(cls, db_alias=DEFAULT_DB_ALIAS, path_field=None):
+    def disabled_tree_trigger(
+        cls, db_alias=DEFAULT_DB_ALIAS, path_field: "Optional[str]" = None
+    ):
         """
         Context manager for temporarily disabling django-tree triggers.
 
