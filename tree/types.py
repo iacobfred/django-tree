@@ -1,5 +1,5 @@
 from django.db.models import Model, QuerySet
-from typing import cast, Generic, TypeVar, TYPE_CHECKING
+from typing import List, Union, cast, Generic, TypeVar, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -13,7 +13,7 @@ class Path(Generic[ModelT]):
     def model(self) -> ModelT:
         return cast(ModelT, self.field.model)
 
-    def __init__(self, field: "Field[Any, Any]", value):
+    def __init__(self, field: "Field[Any, Any]", value: "List[str]"):
 
         self.field = field
         self.attname = getattr(self.field, 'attname', None)
@@ -203,7 +203,11 @@ class Path(Generic[ModelT]):
             return False
         return other[: len(self.value)] == self.value
 
-    def is_descendant_of(self, other, include_self: bool = False):
+    def is_descendant_of(
+        self,
+        other: "Union[Path[ModelT], List]",
+        include_self: bool = False,
+    ) -> bool:
         if not self.value:
             return False
         if isinstance(other, Path):

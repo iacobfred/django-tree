@@ -97,26 +97,33 @@ class TreeModelMixin(MixinProtocol):
     def get_level(self, path_field: "Optional[str]" = None):
         return self._get_path_value(path_field).get_level()
 
-    def is_root(self, path_field: "Optional[str]" = None):
+    def is_root(self, path_field: "Optional[str]" = None) -> bool:
         return self._get_path_value(path_field).is_root()
 
-    def is_leaf(self, path_field: "Optional[str]" = None):
+    def is_leaf(self, path_field: "Optional[str]" = None) -> bool:
         return self._get_path_value(path_field).is_leaf()
 
     def is_ancestor_of(
-        self, other, include_self=False, path_field: "Optional[str]" = None
-    ):
+        self,
+        other: "Self",
+        include_self: bool = False,
+        path_field: "Optional[str]" = None,
+    ) -> bool:
         return self._get_path_value(path_field).is_ancestor_of(
             other._get_path_value(path_field), include_self=include_self
         )
 
     def is_descendant_of(
-        self, other, include_self=False, path_field: "Optional[str]" = None
-    ):
+        self,
+        other: "Self",
+        include_self: bool = False,
+        path_field: "Optional[str]" = None,
+    ) -> bool:
         return self._get_path_value(path_field).is_descendant_of(
             other._get_path_value(path_field), include_self=include_self
         )
 
+    @override
     def clean(self):
         super().clean()
         if not self._state.adding:
@@ -150,6 +157,7 @@ class TreeModelMixin(MixinProtocol):
                         }
                     )
 
+    @override
     def delete(self, using=None, **kwargs):
         assert (
             self.pk is not None
