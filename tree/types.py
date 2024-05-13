@@ -1,5 +1,5 @@
 from django.db.models import Model, QuerySet
-from typing import List, Union, cast, Generic, TypeVar, TYPE_CHECKING
+from typing import List, Union, cast, Generic, TypeVar, TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from typing import Any
@@ -14,7 +14,6 @@ class Path(Generic[ModelT]):
         return cast(ModelT, self.field.model)
 
     def __init__(self, field: "Field[Any, Any]", value: "List[str]"):
-
         self.field = field
         self.attname = getattr(self.field, 'attname', None)
         self.field_bound = self.attname is not None
@@ -23,11 +22,13 @@ class Path(Generic[ModelT]):
         )
         self.value = value
 
+    @override
     def __repr__(self):
         if self.field_bound:
             return '<Path %s %s>' % (self.field, self.value)
         return '<Path %s>' % self.value
 
+    @override
     def __str__(self):
         return str(self.value)
 
